@@ -7,7 +7,10 @@ class Honeypot(asyncssh.SSHServer):
 		self._conn = conn
 		self.ip = conn.get_extra_info('peername')[0]
 		print(f'Connection from: {self.ip}', flush=True)
-
+    
+	def password_auth_supported(self):
+        return True
+		
 	def validate_password(self, username, password):
 		print(f'This: {username}, {password}', flush=True)
 		return False
