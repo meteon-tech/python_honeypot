@@ -2,12 +2,22 @@
 import socket
 import logging
 import csv
-#import threading
+import datetime
 from concurrent.futures import ThreadPoolExecutor
 
 HOST = '0.0.0.0'
 PORT = 2323
 LOG_FILE = 'telnet_honeypot_logs.csv' 
+
+
+def logCsv(timestamp, ip, port, command):
+	row = [timestamp, ip, port, command]
+	try:
+		with open(LOG_FILE, 'a') as file:
+			write = csv.writer(file)
+			write.writerow(row)
+	except Exception as e:
+		print(f'Failed to write to log file: {e}')
 
 
 def handleClient(client, addr):
@@ -21,6 +31,7 @@ def handleClient(client, addr):
 				break
 			print(data)
 			command = data.decode().strip()
+			logCsv(datetime.datetime.now(), addr[0], addr[1], command)
 			if command.lower() == 'exit':
 				break
 			elif command.lower() == 'whoami':
