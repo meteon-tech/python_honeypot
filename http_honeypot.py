@@ -1,8 +1,9 @@
 #!/usr/bin/python3
 import socket
-from datetime import datetime, UTC
+import datetime
 import logging
 import csv
+from concurrent.futures import ThreadPoolExecutor
 
 HOST = '0.0.0.0'
 PORT = 8080
@@ -21,23 +22,12 @@ def logCsv(timestamp, ip, port, method, path, status, userAgent):
 	except Exception as e:
 		logging.warning('Failed to write to log file', e)
 
-
-def main():
-	print('Honeypot started...')
-	server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
+def handleClient(client, addr):
 	try:
-		server.bind((HOST, PORT))
-		server.listen(5)
-
-		print(f'Honeypot is listening on {HOST}:{PORT}')
-
 		while True:
-			client, addr = server.accept()
-			print(f'Session accepted by {addr[0]}:{addr[1]}\n')
-
 			data = client.recv(1024).decode()
+			if not data:
+				break
 
 			#Rozdeli data, ziskam GET / HTTP1.1 jako jeden celek
 			parsedData = data.split('\r\n')
@@ -48,8 +38,6 @@ def main():
 			method = parts[0] if len(parts) > 0 else 'UNKNOWN'
 			path = parts[1] if len(parts) > 1 else '/'
 
-			#print(path)
-			#print(parsedData)
 			#Hledani user-agenta v prijmutych a dekodovanych datech
 			userAgent = 'UNKNOWN'
 			for item in parsedData:
@@ -82,8 +70,28 @@ def main():
 				)
 				client.send(httpResponse.encode())
 				status = 404
-			logCsv(datetime.now(UTC), addr[0], addr[1], method, path, status, userAgent)
+			logCsv(datetime.datetime.now(), addr[0], addr[1], method, path, status, userAgent)
+	except Exception as e:
+		print(e)
+	finally:
+		client.close()
 
+def main():
+	print('Honeypot started...')
+	server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+	server.bind((HOST, PORT))
+	server.listen(5)
+
+	try:
+		print(f'Honeypot is listening on {HOST}:{PORT}')
+
+		with ThreadPoolExecutor(max_workers=10) as executor:
+			while True:
+				client, addr = server.accept()
+				print(f'Session accepted by {addr[0]}:{addr[1]}\n')
+				executor.submit(handleClient, client, addr)
 	except KeyboardInterrupt:
 		print('Honeypot was stopped by user')
 	finally:
