@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 HOST = '0.0.0.0'
 PORT = 2323
-LOG_FILE = 'telnet_honeypot_logs.csv' 
+LOG_FILE = 'honeypot_telnet_logs.csv' 
 
 
 def logCsv(timestamp, ip, port, command):
