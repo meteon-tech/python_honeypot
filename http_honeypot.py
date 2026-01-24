@@ -3,11 +3,14 @@ import socket
 import datetime
 import logging
 import csv
+import html #osetreni vypisu dat
 from concurrent.futures import ThreadPoolExecutor
 
 HOST = '0.0.0.0'
 PORT = 8080
 LOG_FILE = 'honeypot_http_logs.csv'
+SERVER_BANNER = 'Apache/2.4.41 (Ubuntu)'
+PHP_VERSION = 'PHP/7.4.3'
 
 
 #Nastaveni zakladni konfigurace logovani
@@ -47,29 +50,36 @@ def handleClient(client, addr):
 					userAgent = item.split(':', 1)[1].strip()
 
 			if path == '/admin':
-				bodyResponse = "<html><body><h1>Admin page hello</h1></body></html>"
-				bodyLenght = str(len(bodyResponse))
-				httpResponseAdmin = (
-					"HTTP/1.1 200 OK\r\n"
-					"Content-Type: text/html\r\n"
-					"Connection: close \r\n"
-					"Content-Length:"+ bodyLenght +" \r\n\r\n"
-					+ bodyResponse
-				)
-				client.send(httpResponseAdmin.encode())
+				bodyResponse = f"""<!DOCTYPE html>
+<html>
+<head><title>Admin page</title></head>
+<body>
+	<h1>System</h1>
+	<p>Server is running on PHP version: {PHP_VERSION}</p>
+</body>
+</html>"""
 				status = 200
 			else:
-				bodyResponse = "<html><body><h1>404 Not Found</h1></body></html>"
-				bodyLenght = str(len(bodyResponse))
-				httpResponse = (
-					"HTTP/1.1 404 Not Found\r\n"
-					"Content-Type: text/html\r\n"
-					"Connection: close \r\n"
-					"Content-Length:"+ bodyLenght +"\r\n\r\n"
-					+ bodyResponse
-				)
-				client.send(httpResponse.encode())
+				bodyResponse = f"""<!DOCTYPE html>
+<html>
+<head><title>404 Not Found</title></head>
+<body>
+	<h1>Not Found</h1>
+	<p>The requested URL {html.escape(path)} was not found on this server.
+	<p>{SERVER_BANNER}</p>
+</body>
+</html>"""
 				status = 404
+
+			httpResponse = (
+				"HTTP/1.1 404 Not Found\r\n"
+				f"Server: {SERVER_BANNER}\r\n"
+				f"X-Powered-By: {PHP_VERSION}\r\n"
+				"Content-Type: text/html\r\n"
+				"Connection: close \r\n"
+				f"Content-Length: {len(bodyResponse)}\r\n\r\n" + bodyResponse
+			)
+			client.send(httpResponse.encode())
 			logCsv(datetime.datetime.now(), addr[0], addr[1], method, path, status, userAgent)
 	except Exception as e:
 		print(e)
