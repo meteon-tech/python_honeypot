@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 HOST = '0.0.0.0'
 PORT = 2323
 LOG_FILE = 'honeypot_telnet_logs.csv' 
-
+BANNER = b'Linux 3.10.14 armv7l\r\n\r\n# '
 
 def logCsv(timestamp, ip, port, command):
 	row = [timestamp, ip, port, command]
@@ -24,8 +24,8 @@ def handleClient(client, addr):
 	print(addr[0], addr[1])
 	try:
 		client.settimeout(30)
+		client.send(BANNER)
 		while True:
-			client.send(b'root~')
 			data = client.recv(1024)
 			if not data:
 				break
@@ -36,6 +36,9 @@ def handleClient(client, addr):
 				break
 			elif command.lower() == 'whoami':
 				client.send(b'root\r\n')
+			elif command.lower() == 'ls':
+				client.send(b'bin	dev	etc	home	lib	proc	root	tmp	var\r\n')
+			client.send(b'# ')
 	except Exception as e:
 		print(e)
 	finally:
@@ -45,7 +48,6 @@ def handleClient(client, addr):
 def main():
 	server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
 	server.bind((HOST, PORT))
 	server.listen(10)
 
@@ -54,9 +56,6 @@ def main():
 			while True:
 				client, addr = server.accept()
 				executor.submit(handleClient, client, addr)
-			#thread = threading.Thread(target=handleClient, args=(client, addr))
-			#thread.daemon = True
-			#thread.start()
 	except KeyboardInterrupt:
 		print('Telnet was stopped by user')
 	finally:
