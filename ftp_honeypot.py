@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 import os
 import csv
 import logging
@@ -32,12 +33,12 @@ authorizer = MyAuthorizer()
 handler = FTPHandler
 handler.authorizer = authorizer
 
-handler.banner = 'Hello'
+handler.banner = 'ProFTPD 1.3.5 Server (Debian)'
 
 address = (HOST, PORT)
 server = FTPServer(address, handler)
 
-server.max_cons = 256
+server.max_cons = 50
 server.max_cons_per_ip = 5
 
 server.serve_forever()
