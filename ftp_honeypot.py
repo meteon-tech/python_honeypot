@@ -1,6 +1,5 @@
 #!/usr/bin/python3
 import os
-import csv
 import logging
 import datetime
 from pyftpdlib.authorizers import DummyAuthorizer, AuthenticationFailed
@@ -11,21 +10,23 @@ LOG_FILE = 'honeypot_ftp_logs.csv'
 PORT = 2121
 HOST = '0.0.0.0'
 
+honeypotLogger = logging.getLogger('honeypotFtp')
+honeypotLogger.setLevel(logging.INFO)
+
+logFormat = logging.Formatter('%(asctime)s,%(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
+fileHandler = logging.FileHandler(LOG_FILE, mode='a', encoding='utf-8')
+fileHandler.setFormatter(logFormat)
+honeypotLogger.addHandler(fileHandler)
+
+
 class MyAuthorizer(DummyAuthorizer):
 	def validate_authentication(self, username, password, handler):
 		ip = handler.remote_ip
 		port = handler.remote_port
 
-		print(ip, port, username, password)
-		logCsv(datetime.datetime.now(), ip, port, username, password)
+		honeypotLogger.info(f"{ip},{port},{username},{password}")
 		raise AuthenticationFailed('Authentication failed')
-
-
-def logCsv(timestamp, ip, port, username, password):
-	row = [timestamp, ip, port, username, password]
-	with open(LOG_FILE, 'a') as file:
-		write = csv.writer(file)
-		write.writerow(row)
 
 
 authorizer = MyAuthorizer()
