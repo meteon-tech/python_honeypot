@@ -1,32 +1,24 @@
 #!/usr/bin/python3
 import socket
-import datetime
 import logging
-import csv
 import html #osetreni vypisu dat
-from concurrent.futures import ThreadPoolExecutor
+import threading
 
 HOST = '0.0.0.0'
 PORT = 8080
 LOG_FILE = 'honeypot_http_logs.csv'
 SERVER_BANNER = 'Apache/2.4.41 (Ubuntu)'
 PHP_VERSION = 'PHP/7.4.3'
+MAX_CONNECTIONS = 10
 
+threadLimiter = threading.Semaphore(MAX_CONNECTIONS)
 
-#Nastaveni zakladni konfigurace logovani
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
-
-def logCsv(timestamp, ip, port, method, path, status, userAgent):
-	row = [timestamp, ip, port, method, path, status, userAgent]
-	try:
-		with open(LOG_FILE, 'a') as file:
-			write = csv.writer(file)
-			write.writerow(row)
-	except Exception as e:
-		logging.warning('Failed to write to log file', e)
 
 def handleClient(client, addr):
+	ip = addr[0]
+	port = addr[1]
 	try:
+		client.settimeout(30)
 		while True:
 			data = client.recv(1024).decode()
 			if not data:
@@ -76,32 +68,51 @@ def handleClient(client, addr):
 				f"Server: {SERVER_BANNER}\r\n"
 				f"X-Powered-By: {PHP_VERSION}\r\n"
 				"Content-Type: text/html\r\n"
-				"Connection: close \r\n"
+				"Connection: keep-alive \r\n"
 				f"Content-Length: {len(bodyResponse)}\r\n\r\n" + bodyResponse
 			)
 			client.send(httpResponse.encode())
-			logCsv(datetime.datetime.now(), addr[0], addr[1], method, path, status, userAgent)
+			logging.info(f"{ip},{port},{method},{path},{status},{userAgent}")
 	except Exception as e:
 		print(e)
 	finally:
 		client.close()
+		threadLimiter.release()
 
 def main():
+	logFormat = logging.Formatter('%(asctime)s,%(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
+	fileHandler = logging.FileHandler(LOG_FILE, mode='a', encoding='utf-8')
+	fileHandler.setFormatter(logFormat)
+
+	logger = logging.getLogger()
+	logger.setLevel(logging.INFO)
+	logger.addHandler(fileHandler)
+
 	print('Honeypot started...')
 	server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
 	server.bind((HOST, PORT))
 	server.listen(5)
+
+	server.settimeout(1)
 
 	try:
 		print(f'Honeypot is listening on {HOST}:{PORT}')
 
-		with ThreadPoolExecutor(max_workers=10) as executor:
-			while True:
+		while True:
+			try:
 				client, addr = server.accept()
-				print(f'Session accepted by {addr[0]}:{addr[1]}\n')
-				executor.submit(handleClient, client, addr)
+				if threadLimiter.acquire(blocking=False):
+					thread = threading.Thread(target=handleClient, args=(client, addr))
+					thread.daemon = True
+					thread.start()
+				else:
+					client.close()
+			except socket.timeout:
+				continue
+
+			print(f'Session accepted by {addr[0]}:{addr[1]}\n')
 	except KeyboardInterrupt:
 		print('Honeypot was stopped by user')
 	finally:
