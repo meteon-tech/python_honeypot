@@ -1,8 +1,18 @@
 #!/usr/bin/python3
 import asyncssh
 import asyncio
-import csv
-import datetime
+import logging
+
+LOG_SSH = 'honeypot_ssh_logs.csv'
+
+logFormat = logging.Formatter('%(asctime)s,%(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
+fileHandler = logging.FileHandler(LOG_SSH, mode='a', encoding='utf-8')
+fileHandler.setFormatter(logFormat)
+
+honeypotLogger = logging.getLogger('honeypotSSH')
+honeypotLogger.setLevel(logging.INFO)
+honeypotLogger.addHandler(fileHandler)
 
 class Honeypot(asyncssh.SSHServer):
 	def connection_made(self, conn):
@@ -14,21 +24,12 @@ class Honeypot(asyncssh.SSHServer):
 		return True
 
 	def validate_password(self, username, password):
-		print(f'This: {username}, {password}', flush=True)
-		logCsvSsh(datetime.datetime.now(), self.ip, username, password)
+		print(f'Log in: {username}, {password}', flush=True)
+
+		honeypotLogger.info(f"{self.ip},{username},{password}")
 		return False
 
-LOG_SSH = 'honeypot_ssh_logs.csv'
 
-
-def logCsvSsh(timestamp, ip, user, password):
-	row = [timestamp, ip, user, password]
-	try:
-		with open(LOG_SSH, 'a') as file:
-			write = csv.writer(file)
-			write.writerow(row)
-	except Exception as e:
-		print(e)
 
 async def serverStart():
 	key = asyncssh.generate_private_key('ssh-rsa')
