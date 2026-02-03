@@ -64,6 +64,7 @@ def handleClient(client, addr):
 </body>
 </html>"""
 			status = 200
+			statusText = '200 OK'
 		else:
 			bodyResponse = f"""<!DOCTYPE html>
 <html>
@@ -75,14 +76,15 @@ def handleClient(client, addr):
 </body>
 </html>"""
 			status = 404
+			statusText = '404 Not Found'
 
 		httpResponse = (
-			"HTTP/1.1 404 Not Found\r\n"
+			f"HTTP/1.1 {statusText}\r\n"
 			f"Server: {SERVER_BANNER}\r\n"
 			f"X-Powered-By: {PHP_VERSION}\r\n"
 			"Content-Type: text/html\r\n"
-			"Connection: keep-alive \r\n"
-			f"Content-Length: {len(bodyResponse)}\r\n\r\n" + bodyResponse
+			"Connection: close \r\n"
+			f"Content-Length: {len(bodyResponse.encode())}\r\n\r\n" + bodyResponse
 		)
 		client.send(httpResponse.encode())
 		logging.info(f"{ip},{port},{method},{path},{status},{userAgent}")
