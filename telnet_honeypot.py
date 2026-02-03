@@ -1,14 +1,13 @@
 #!/usr/bin/python3
 import socket
 import logging
-import datetime
 import threading
 
 HOST = '0.0.0.0'
 PORT = 2323
 LOG_FILE = 'honeypot_telnet_logs.csv' 
 BANNER = b'Linux 3.10.14 armv7l\r\n\r\n# '
-MAX_CONNECTIONS = 2
+MAX_CONNECTIONS = 5
 MAX_CONNECTION_SIZE = 4096
 
 threadLimiter = threading.Semaphore(MAX_CONNECTIONS)
@@ -49,15 +48,14 @@ def handleClient(client, addr):
 					continue
 
 				command = line.decode(errors='replace').strip()
-				#if command.startswith('\xff'):
-				#	return
-
-				#command = data.decode(errors='ignore').strip()
 
 				if not command:
 					client.send(b'# ')
 					continue
-				logging.info(f"{ip},{port},{command}")
+
+				safeCommand = command.replace(',', ';').replace('\n', ' ').replace('\r', '')
+				logging.info(f"{ip},{port},{safeCommand}")
+
 				if command.lower() == 'exit':
 					return
 				elif command.lower() == 'whoami':
