@@ -19,6 +19,12 @@ def handleClient(client, addr):
 	ip = addr[0]
 	port = addr[1]
 	requestBuffer = b''
+
+	method = 'UNKNOWN'
+	path = 'UNKNOWN'
+	userAgent = 'UNKNOWN'
+	status = 500
+
 	try:
 		client.settimeout(30)
 		while True:
@@ -35,25 +41,31 @@ def handleClient(client, addr):
 		if not requestBuffer:
 			return
 
-		data = requestBuffer.decode()
+		data = requestBuffer.decode(errors='replace')
 
 		#Rozdeli data, ziskam GET / HTTP1.1 jako jeden celek
-		parsedData = data.split('\r\n')
+		parsedData = data.splitlines()
 		#Rozdelim data na jednotlive kusy GET, /, HTTP1.1
-		parts = parsedData[0].split()
+		if parsedData:
+			parts = parsedData[0].split()
+			if len(parts) >= 1:
+				method = parts[0]
 
-		#Zjistim jestli list ma prvky
-		method = parts[0] if len(parts) > 0 else 'UNKNOWN'
-		path = parts[1] if len(parts) > 1 else '/'
+			if len(parts) >= 2:
+				path = parts[1]
+			else:
+				path = '/'
 
 		#Hledani user-agenta v prijmutych a dekodovanych datech
-		userAgent = 'UNKNOWN'
+		#userAgent = 'UNKNOWN'
 		for item in parsedData:
-			if item.lower().startswith('user-agent'):
+			if item.lower().startswith('user-agent:'):
 				#.split() rozdeli podle : ale jenom jednou (:, 1)
 				#.strip() ocisti data na zacatku a na konci od neviditelnych znaku
-				userAgent = item.split(':', 1)[1].strip()
-
+				try:
+					userAgent = item.split(':', 1)[1].strip()
+				except Exception as e:
+					print(e)
 		if path == '/admin':
 			bodyResponse = f"""<!DOCTYPE html>
 <html>
@@ -87,7 +99,12 @@ def handleClient(client, addr):
 			f"Content-Length: {len(bodyResponse.encode())}\r\n\r\n" + bodyResponse
 		)
 		client.send(httpResponse.encode())
-		logging.info(f"{ip},{port},{method},{path},{status},{userAgent}")
+
+		safeUserAgent = userAgent.replace(',', ';')
+		safeMethod = method.replace(',', '')
+		safePath = path.replace(',', '%2C')
+
+		logging.info(f"{ip},{port},{safeMethod},{safePath},{status},{safeUserAgent}")
 	except socket.timeout:
 		pass
 	except Exception as e:
@@ -121,8 +138,7 @@ def main():
 			try:
 				client, addr = server.accept()
 				if threadLimiter.acquire(blocking=False):
-					thread = threading.Thread(target=handleClient, args=(client, addr))
-					thread.daemon = True
+					thread = threading.Thread(target=handleClient, args=(client, addr), daemon=True)
 					thread.start()
 				else:
 					client.close()
