@@ -7,7 +7,7 @@ HOST = '0.0.0.0'
 PORT = 2323
 LOG_FILE = 'honeypot_telnet_logs.csv' 
 BANNER = b'Linux 3.10.14 armv7l\r\n\r\n# '
-MAX_CONNECTIONS = 5
+MAX_CONNECTIONS = 10
 MAX_CONNECTION_SIZE = 4096
 
 threadLimiter = threading.Semaphore(MAX_CONNECTIONS)
@@ -23,10 +23,9 @@ def handleClient(client, addr):
 		client.send(BANNER)
 		while True:
 			data = client.recv(1024)
-			print(data.hex())
+
 			if not data:
 				break
-			print(data)
 
 			size += len(data)
 			if size > MAX_CONNECTION_SIZE:
@@ -38,8 +37,8 @@ def handleClient(client, addr):
 				return
 
 			while b'\n' in buffer:
-
-				line, buffer = buffer.split(b'\n', 1)
+				line, rest = buffer.split(b'\n', 1)
+				buffer = bytearray(rest)
 
 				line = line.replace(b'\r', b'')
 
@@ -65,10 +64,11 @@ def handleClient(client, addr):
 				client.send(b'# ')
 	except socket.timeout:
 		pass
+	except ConnectionError:
+		logging.warning(f"Connection lost with {ip}")
 	except Exception as e:
-		print(e)
+		logging.error("Error handling the client {e}")
 	finally:
-		print('finnaly')
 		client.close()
 		threadLimiter.release()
 
@@ -96,11 +96,9 @@ def main():
 			try:
 				client, addr = server.accept()
 				if threadLimiter.acquire(blocking=False):
-					thread = threading.Thread(target=handleClient, args=(client, addr))
-					thread.daemon = True
+					thread = threading.Thread(target=handleClient, args=(client, addr), daemon=True)
 					thread.start()
 				else:
-					print('connection refused')
 					client.close()
 			except socket.timeout:
 				continue
