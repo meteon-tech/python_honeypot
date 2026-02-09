@@ -89,6 +89,8 @@ def main():
 	server.listen(5)
 	server.settimeout(1)
 
+	print('Telnet started')
+	print(f'Telnet is listening on: {HOST}:{PORT}')
 	try:
 		while True:
 			try:
