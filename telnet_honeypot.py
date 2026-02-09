@@ -67,7 +67,7 @@ def handleClient(client, addr):
 	except ConnectionError:
 		logging.warning(f"Connection lost with {ip}")
 	except Exception as e:
-		logging.error("Error handling the client {e}")
+		logging.error(f"Error handling the client {e}")
 	finally:
 		client.close()
 		threadLimiter.release()
