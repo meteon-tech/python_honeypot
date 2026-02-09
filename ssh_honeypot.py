@@ -4,6 +4,8 @@ import asyncio
 import logging
 
 LOG_SSH = 'honeypot_ssh_logs.csv'
+HOST = '0.0.0.0'
+PORT = 2222
 
 logFormat = logging.Formatter('%(asctime)s,%(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
@@ -17,16 +19,21 @@ honeypotLogger.addHandler(fileHandler)
 class Honeypot(asyncssh.SSHServer):
 	def connection_made(self, conn):
 		self._conn = conn
-		self.ip = conn.get_extra_info('peername')[0]
-		print(f'Connection from: {self.ip}', flush=True)
+		peername = conn.get_extra_info('peername')
+
+		self.ip = peername[0]
+		self.port = peername[1]
 
 	def password_auth_supported(self):
 		return True
 
+#	def kbdint_auth_supported(self):
+#		return False
+
 	def validate_password(self, username, password):
 		print(f'Log in: {username}, {password}', flush=True)
-
-		honeypotLogger.info(f"{self.ip},{username},{password}")
+		self.clientVersion = self._conn.get_extra_info('client_version')
+		honeypotLogger.info(f"{self.ip},{self.port},{username},{password},{self.clientVersion}")
 		return False
 
 
@@ -36,16 +43,17 @@ async def serverStart():
 
 	await asyncssh.create_server(
 		Honeypot,
-		host='0.0.0.0',
-		port=2222,
+		host=HOST,
+		port=PORT,
 		server_host_keys=[key],
 		password_auth=True,
+		kbdint_auth=False
 	)
 
-	print('Honeypot is runing on port 2222')
+	print(f'Honeypot is runing on: {HOST}:{PORT}')
 	await asyncio.Future()
 
 try:
 	asyncio.run(serverStart())
 except KeyboardInterrupt:
-	print(f'Honeypot is shutting down')
+	print(f'SSH was stopped by user')
