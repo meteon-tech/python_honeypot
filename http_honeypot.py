@@ -3,9 +3,15 @@ import socket
 import logging
 import html #osetreni vypisu dat
 import threading
+import configparser
 
-HOST = '0.0.0.0'
-PORT = 8080
+config = configparser.ConfigParser()
+config.read('config.ini')
+
+HOST = config.get('HTTP', 'Host')
+HTTP_PORT = config.getint('HTTP', 'Port')
+
+#print(type(PORT))
 LOG_FILE = 'honeypot_http_logs.csv'
 SERVER_BANNER = 'Apache/2.4.41 (Ubuntu)'
 PHP_VERSION = 'PHP/7.4.3'
@@ -57,7 +63,6 @@ def handleClient(client, addr):
 				path = '/'
 
 		#Hledani user-agenta v prijmutych a dekodovanych datech
-		#userAgent = 'UNKNOWN'
 		for item in parsedData:
 			if item.lower().startswith('user-agent:'):
 				#.split() rozdeli podle : ale jenom jednou (:, 1)
@@ -107,8 +112,10 @@ def handleClient(client, addr):
 		logging.info(f"{ip},{port},{safeMethod},{safePath},{status},{safeUserAgent}")
 	except socket.timeout:
 		pass
+	except ConnectionError:
+		logging.warning(f"Connection lost with {ip}")
 	except Exception as e:
-		print(e)
+		logging.error(f"Error handling the client {e}")
 	finally:
 		client.close()
 		threadLimiter.release()
@@ -123,16 +130,15 @@ def main():
 	logger.setLevel(logging.INFO)
 	logger.addHandler(fileHandler)
 
-	print('Honeypot started...')
 	server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-	server.bind((HOST, PORT))
+	server.bind((HOST, HTTP_PORT))
 	server.listen(5)
-
 	server.settimeout(1)
 
 	try:
-		print(f'Honeypot is listening on {HOST}:{PORT}')
+		print('HTTP started...')
+		print(f'HTTP honeypot is listening on {HOST}:{HTTP_PORT}')
 
 		while True:
 			try:
