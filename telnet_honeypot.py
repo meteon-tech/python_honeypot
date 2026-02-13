@@ -2,9 +2,14 @@
 import socket
 import logging
 import threading
+import configparser
 
-HOST = '0.0.0.0'
-PORT = 2323
+config = configparser.ConfigParser()
+config.read('config.ini')
+
+HOST = config.get('Telnet', 'Host')
+PORT = config.getint('Telnet', 'Port')
+
 LOG_FILE = 'honeypot_telnet_logs.csv' 
 BANNER = b'Linux 3.10.14 armv7l\r\n\r\n# '
 MAX_CONNECTIONS = 10
@@ -17,7 +22,7 @@ def handleClient(client, addr):
 	port = addr[1]
 	logging.info(f"Connection made from: {ip}:{port}")
 	buffer = bytearray()
-	size = 0
+	sizeData = 0
 	try:
 		client.settimeout(30)
 		client.send(BANNER)
@@ -27,12 +32,12 @@ def handleClient(client, addr):
 			if not data:
 				break
 
-			size += len(data)
-			if size > MAX_CONNECTION_SIZE:
+			sizeData += len(data)
+			if sizeData > MAX_CONNECTION_SIZE:
 				break
 
 			buffer.extend(data)
-
+			#hledame jestli uzivatel neposlal telnet interrupt process Ctrl-c xff,xf4
 			if b'\xff\xf4' in buffer:
 				return
 
@@ -90,7 +95,7 @@ def main():
 	server.settimeout(1)
 
 	print('Telnet started')
-	print(f'Telnet is listening on: {HOST}:{PORT}')
+	print(f'Telnet honeypot is listening on: {HOST}:{PORT}')
 	try:
 		while True:
 			try:
