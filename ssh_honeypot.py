@@ -2,10 +2,14 @@
 import asyncssh
 import asyncio
 import logging
+import configparser
+
+config = configparser.ConfigParser()
+config.read('config.ini')
 
 LOG_SSH = 'honeypot_ssh_logs.csv'
-HOST = '0.0.0.0'
-PORT = 2222
+HOST = config.get('SSH', 'Host')
+SSH_PORT = config.getint('SSH', 'Port')
 
 logFormat = logging.Formatter('%(asctime)s,%(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
@@ -27,11 +31,8 @@ class Honeypot(asyncssh.SSHServer):
 	def password_auth_supported(self):
 		return True
 
-#	def kbdint_auth_supported(self):
-#		return False
-
 	def validate_password(self, username, password):
-		print(f'Log in: {username}, {password}', flush=True)
+		print(f'Log in: {username}, {password}')
 		self.clientVersion = self._conn.get_extra_info('client_version')
 		honeypotLogger.info(f"{self.ip},{self.port},{username},{password},{self.clientVersion}")
 		return False
@@ -44,13 +45,13 @@ async def serverStart():
 	await asyncssh.create_server(
 		Honeypot,
 		host=HOST,
-		port=PORT,
+		port=SSH_PORT,
 		server_host_keys=[key],
 		password_auth=True,
 		kbdint_auth=False
 	)
 
-	print(f'Honeypot is runing on: {HOST}:{PORT}')
+	print(f'SSH honeypot is runing on: {HOST}:{SSH_PORT}')
 	await asyncio.Future()
 
 try:
