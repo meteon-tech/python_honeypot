@@ -1,14 +1,16 @@
 #!/usr/bin/python3
-import os
 import logging
-import datetime
+import configparser
 from pyftpdlib.authorizers import DummyAuthorizer, AuthenticationFailed
 from pyftpdlib.handlers import FTPHandler
 from pyftpdlib.servers import FTPServer
 
+config = configparser.ConfigParser()
+config.read('config.ini')
+
 LOG_FILE = 'honeypot_ftp_logs.csv'
-PORT = 2121
-HOST = '0.0.0.0'
+FTP_PORT = config.getint('FTP', 'Port')
+HOST = config.get('FTP', 'Host')
 
 honeypotLogger = logging.getLogger('honeypotFtp')
 honeypotLogger.setLevel(logging.INFO)
@@ -36,10 +38,10 @@ handler.authorizer = authorizer
 
 handler.banner = 'ProFTPD 1.3.5 Server (Debian)'
 
-address = (HOST, PORT)
+address = (HOST, FTP_PORT)
 server = FTPServer(address, handler)
 
 server.max_cons = 50
-server.max_cons_per_ip = 5
+server.max_cons_per_ip = 3
 
 server.serve_forever()
