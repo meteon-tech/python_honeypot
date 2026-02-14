@@ -8,17 +8,17 @@ config = configparser.ConfigParser()
 config.read('config.ini')
 
 LOG_SSH = 'honeypot_ssh_logs.csv'
-HOST = config.get('SSH', 'Host')
-SSH_PORT = config.getint('SSH', 'Port')
+HOST = config.get('SSH', 'Host', fallback='0.0.0.0')
+SSH_PORT = config.getint('SSH', 'Port', fallback=2222)
 
 logFormat = logging.Formatter('%(asctime)s,%(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
-fileHandler = logging.FileHandler(LOG_SSH, mode='a', encoding='utf-8')
-fileHandler.setFormatter(logFormat)
+honeypotFile = logging.FileHandler(LOG_SSH)
+honeypotFile.setFormatter(logFormat)
 
-honeypotLogger = logging.getLogger('honeypotSSH')
-honeypotLogger.setLevel(logging.INFO)
-honeypotLogger.addHandler(fileHandler)
+honeypotLog = logging.getLogger('honeypotSSH')
+honeypotLog.setLevel(logging.INFO)
+honeypotLog.addHandler(honeypotFile)
 
 class Honeypot(asyncssh.SSHServer):
 	def connection_made(self, conn):
@@ -34,7 +34,7 @@ class Honeypot(asyncssh.SSHServer):
 	def validate_password(self, username, password):
 		print(f'Log in: {username}, {password}')
 		self.clientVersion = self._conn.get_extra_info('client_version')
-		honeypotLogger.info(f"{self.ip},{self.port},{username},{password},{self.clientVersion}")
+		honeypotLog.info(f"{self.ip},{self.port},{username},{password},{self.clientVersion}")
 		return False
 
 
