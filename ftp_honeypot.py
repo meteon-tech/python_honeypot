@@ -9,17 +9,18 @@ config = configparser.ConfigParser()
 config.read('config.ini')
 
 LOG_FILE = 'honeypot_ftp_logs.csv'
-FTP_PORT = config.getint('FTP', 'Port')
-HOST = config.get('FTP', 'Host')
-
-honeypotLogger = logging.getLogger('honeypotFtp')
-honeypotLogger.setLevel(logging.INFO)
+FTP_PORT = config.getint('FTP', 'Port', fallback=2121)
+HOST = config.get('FTP', 'Host', fallback='0.0.0.0')
 
 logFormat = logging.Formatter('%(asctime)s,%(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
-fileHandler = logging.FileHandler(LOG_FILE, mode='a', encoding='utf-8')
-fileHandler.setFormatter(logFormat)
-honeypotLogger.addHandler(fileHandler)
+honeypotFile = logging.FileHandler(LOG_FILE)
+honeypotFile.setFormatter(logFormat)
+
+
+honeypotLog = logging.getLogger('honeypotFTP')
+honeypotLog.setLevel(logging.INFO)
+honeypotLog.addHandler(honeypotFile)
 
 
 class MyAuthorizer(DummyAuthorizer):
@@ -27,7 +28,7 @@ class MyAuthorizer(DummyAuthorizer):
 		ip = handler.remote_ip
 		port = handler.remote_port
 
-		honeypotLogger.info(f"{ip},{port},{username},{password}")
+		honeypotLog.info(f"{ip},{port},{username},{password}")
 		raise AuthenticationFailed('Authentication failed')
 
 
@@ -41,7 +42,7 @@ handler.banner = 'ProFTPD 1.3.5 Server (Debian)'
 address = (HOST, FTP_PORT)
 server = FTPServer(address, handler)
 
-server.max_cons = 50
+server.max_cons = config.getint('FTP', 'Connections', fallback=50)
 server.max_cons_per_ip = 3
 
 server.serve_forever()
