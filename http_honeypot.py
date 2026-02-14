@@ -8,14 +8,24 @@ import configparser
 config = configparser.ConfigParser()
 config.read('config.ini')
 
-HOST = config.get('HTTP', 'Host')
-HTTP_PORT = config.getint('HTTP', 'Port')
+LOG_FILE = 'honeypot_http_logs.csv'
+HOST = config.get('HTTP', 'Host', fallback='0.0.0.0')
+HTTP_PORT = config.getint('HTTP', 'Port', fallback=8080)
+
+
+logFormat = logging.Formatter('%(asctime)s,%(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
+honeypotFile = logging.FileHandler(LOG_FILE)
+honeypotFile.setFormatter(logFormat)
+
+honeypotLog = logging.getLogger('honeypotHTTP')
+honeypotLog.setLevel(logging.INFO)
+honeypotLog.addHandler(honeypotFile)
 
 #print(type(PORT))
-LOG_FILE = 'honeypot_http_logs.csv'
 SERVER_BANNER = 'Apache/2.4.41 (Ubuntu)'
 PHP_VERSION = 'PHP/7.4.3'
-MAX_CONNECTIONS = 10
+MAX_CONNECTIONS = config.getint('HTTP', 'Connections', fallback=10)
 MAX_REQUEST_SIZE = 4096
 
 threadLimiter = threading.Semaphore(MAX_CONNECTIONS)
@@ -109,27 +119,18 @@ def handleClient(client, addr):
 		safeMethod = method.replace(',', '')
 		safePath = path.replace(',', '%2C')
 
-		logging.info(f"{ip},{port},{safeMethod},{safePath},{status},{safeUserAgent}")
+		honeypotLog.info(f"{ip},{port},{safeMethod},{safePath},{status},{safeUserAgent}")
 	except socket.timeout:
 		pass
 	except ConnectionError:
-		logging.warning(f"Connection lost with {ip}")
+		honeypotLog.warning(f"Connection lost with {ip}")
 	except Exception as e:
-		logging.error(f"Error handling the client {e}")
+		honeypotLog.error(f"Error handling the client {e}")
 	finally:
 		client.close()
 		threadLimiter.release()
 
 def main():
-	logFormat = logging.Formatter('%(asctime)s,%(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-
-	fileHandler = logging.FileHandler(LOG_FILE, mode='a', encoding='utf-8')
-	fileHandler.setFormatter(logFormat)
-
-	logger = logging.getLogger()
-	logger.setLevel(logging.INFO)
-	logger.addHandler(fileHandler)
-
 	server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 	server.bind((HOST, HTTP_PORT))
