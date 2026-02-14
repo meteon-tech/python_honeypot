@@ -7,20 +7,31 @@ import configparser
 config = configparser.ConfigParser()
 config.read('config.ini')
 
-HOST = config.get('Telnet', 'Host')
-PORT = config.getint('Telnet', 'Port')
+HOST = config.get('Telnet', 'Host', fallback='0.0.0.0')
+TELNET_PORT = config.getint('Telnet', 'Port', fallback=2323)
 
 LOG_FILE = 'honeypot_telnet_logs.csv' 
 BANNER = b'Linux 3.10.14 armv7l\r\n\r\n# '
-MAX_CONNECTIONS = 10
+MAX_CONNECTIONS = config.getint('Telnet', 'Connections', fallback=10)
 MAX_CONNECTION_SIZE = 4096
+
+
+logFormat = logging.Formatter('%(asctime)s,%(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
+honeypotFile = logging.FileHandler(LOG_FILE)
+honeypotFile.setFormatter(logFormat)
+
+honeypotLog = logging.getLogger('honeypotTelnet')
+honeypotLog.setLevel(logging.INFO)
+honeypotLog.addHandler(honeypotFile)
+
 
 threadLimiter = threading.Semaphore(MAX_CONNECTIONS)
 
 def handleClient(client, addr):
 	ip = addr[0]
 	port = addr[1]
-	logging.info(f"Connection made from: {ip}:{port}")
+	honeypotLog.info(f"Connection made from: {ip}:{port}")
 	buffer = bytearray()
 	sizeData = 0
 	try:
@@ -58,7 +69,7 @@ def handleClient(client, addr):
 					continue
 
 				safeCommand = command.replace(',', ';').replace('\n', ' ').replace('\r', '')
-				logging.info(f"{ip},{port},{safeCommand}")
+				honeypotLog.info(f"{ip},{port},{safeCommand}")
 
 				if command.lower() == 'exit':
 					return
@@ -68,34 +79,27 @@ def handleClient(client, addr):
 					client.send(b'bin\tdev\tetc\thome\tlib\tproc\troot\ttmp\tvar\r\n')
 				client.send(b'# ')
 	except socket.timeout:
-		pass
+		honeypotLog.warning(f'Connection timed out {ip}')
+
 	except ConnectionError:
-		logging.warning(f"Connection lost with {ip}")
+		honeypotLog.warning(f'Connection lost with {ip}')
 	except Exception as e:
-		logging.error(f"Error handling the client {e}")
+		honeypotLog.error(f'Error handling the client {e}')
 	finally:
 		client.close()
 		threadLimiter.release()
 
 
 def main():
-	logFormat = logging.Formatter('%(asctime)s,%(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-
-	fileHandler = logging.FileHandler(LOG_FILE, mode='a', encoding='utf-8')
-	fileHandler.setFormatter(logFormat)
-
-	logger = logging.getLogger()
-	logger.setLevel(logging.INFO)
-	logger.addHandler(fileHandler)
 
 	server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-	server.bind((HOST, PORT))
+	server.bind((HOST, TELNET_PORT))
 	server.listen(5)
 	server.settimeout(1)
 
 	print('Telnet started')
-	print(f'Telnet honeypot is listening on: {HOST}:{PORT}')
+	print(f'Telnet honeypot is listening on: {HOST}:{TELNET_PORT}')
 	try:
 		while True:
 			try:
