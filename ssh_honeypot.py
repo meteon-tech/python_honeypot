@@ -3,13 +3,26 @@ import asyncssh
 import asyncio
 import logging
 import configparser
+import sys
+import ipaddress
 
 config = configparser.ConfigParser()
 config.read('config.ini')
 
 LOG_SSH = 'honeypot_ssh_logs.csv'
-HOST = config.get('SSH', 'Host', fallback='0.0.0.0')
-SSH_PORT = config.getint('SSH', 'Port', fallback=2222)
+
+try:
+	HOST = config.get('SSH', 'Host', fallback='0.0.0.0')
+	SSH_PORT = config.getint('SSH', 'Port', fallback=2222)
+
+	ipaddress.ip_address(HOST)
+
+	if SSH_PORT > 65535 or SSH_PORT < 1:
+		raise ValueError('Port is out of range')
+
+except Exception as e:
+	print(f'Wrong configuration format: {e}')
+	sys.exit()
 
 logFormat = logging.Formatter('%(asctime)s,%(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
@@ -20,6 +33,9 @@ honeypotLog = logging.getLogger('honeypotSSH')
 honeypotLog.setLevel(logging.INFO)
 honeypotLog.addHandler(honeypotFile)
 
+
+#vytvorim si vlastni tridu do pro overovani uzivatelu a
+#do ni zdedim vse z tridy sshserver
 class Honeypot(asyncssh.SSHServer):
 	def connection_made(self, conn):
 		self._conn = conn
@@ -31,10 +47,13 @@ class Honeypot(asyncssh.SSHServer):
 	def password_auth_supported(self):
 		return True
 
+
+	#upravim si metodu validate_password
 	def validate_password(self, username, password):
-		print(f'Log in: {username}, {password}')
+		print(f'Log in user: {username}')
 		self.clientVersion = self._conn.get_extra_info('client_version')
 		honeypotLog.info(f"{self.ip},{self.port},{username},{password},{self.clientVersion}")
+		#pokazde vratim False, aby se utocnik nemohl prihlasit
 		return False
 
 
