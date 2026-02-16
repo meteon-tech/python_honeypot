@@ -4,13 +4,34 @@ import logging
 import html #osetreni vypisu dat
 import threading
 import configparser
+import ipaddress
+import sys
+
+
+LOG_FILE = 'honeypot_http_logs.csv'
 
 config = configparser.ConfigParser()
 config.read('config.ini')
 
-LOG_FILE = 'honeypot_http_logs.csv'
-HOST = config.get('HTTP', 'Host', fallback='0.0.0.0')
-HTTP_PORT = config.getint('HTTP', 'Port', fallback=8080)
+#osetreni vstupu z konfigurace
+try:
+	HOST = config.get('HTTP', 'Host', fallback='0.0.0.0')
+	HTTP_PORT = config.getint('HTTP', 'Port', fallback=8080)
+	MAX_CONNECTIONS = config.getint('HTTP', 'Connections', fallback=10)
+
+	if not ipaddress.ip_address(HOST):
+		print('Wrong ip address')
+
+
+	if HTTP_PORT > 65535 or HTTP_PORT < 1:
+		raise ValueError('Port is out of range')
+
+	if MAX_CONNECTIONS <= 0:
+		raise ValueError('Max connections must be greater than zero')
+
+except Exception as e:
+	print(f'Wrong configuration format: {e}')
+	sys.exit()
 
 
 logFormat = logging.Formatter('%(asctime)s,%(message)s', datefmt='%Y-%m-%d %H:%M:%S')
@@ -25,12 +46,11 @@ honeypotLog.addHandler(honeypotFile)
 #print(type(PORT))
 SERVER_BANNER = 'Apache/2.4.41 (Ubuntu)'
 PHP_VERSION = 'PHP/7.4.3'
-MAX_CONNECTIONS = config.getint('HTTP', 'Connections', fallback=10)
 MAX_REQUEST_SIZE = 4096
 
 threadLimiter = threading.Semaphore(MAX_CONNECTIONS)
 
-
+#funkce ktera bude obsluhovat prichozi spojeni v novem vlakne
 def handleClient(client, addr):
 	ip = addr[0]
 	port = addr[1]
@@ -58,6 +78,8 @@ def handleClient(client, addr):
 			return
 
 		data = requestBuffer.decode(errors='replace')
+		#print(data)
+
 
 		#Rozdeli data, ziskam GET / HTTP1.1 jako jeden celek
 		parsedData = data.splitlines()
@@ -121,7 +143,8 @@ def handleClient(client, addr):
 
 		honeypotLog.info(f"{ip},{port},{safeMethod},{safePath},{status},{safeUserAgent}")
 	except socket.timeout:
-		pass
+		print('socket timed out')
+
 	except ConnectionError:
 		honeypotLog.warning(f"Connection lost with {ip}")
 	except Exception as e:
@@ -133,7 +156,9 @@ def handleClient(client, addr):
 def main():
 	server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
 	server.bind((HOST, HTTP_PORT))
+
 	server.listen(5)
 	server.settimeout(1)
 
@@ -144,9 +169,11 @@ def main():
 		while True:
 			try:
 				client, addr = server.accept()
+
 				if threadLimiter.acquire(blocking=False):
 					thread = threading.Thread(target=handleClient, args=(client, addr), daemon=True)
 					thread.start()
+
 				else:
 					client.close()
 			except socket.timeout:
