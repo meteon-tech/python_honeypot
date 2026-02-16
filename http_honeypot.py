@@ -19,9 +19,8 @@ try:
 	HTTP_PORT = config.getint('HTTP', 'Port', fallback=8080)
 	MAX_CONNECTIONS = config.getint('HTTP', 'Connections', fallback=10)
 
-	if not ipaddress.ip_address(HOST):
-		print('Wrong ip address')
-
+	
+	ipaddress.ip_address(HOST)
 
 	if HTTP_PORT > 65535 or HTTP_PORT < 1:
 		raise ValueError('Port is out of range')
@@ -59,7 +58,6 @@ def handleClient(client, addr):
 	method = 'UNKNOWN'
 	path = 'UNKNOWN'
 	userAgent = 'UNKNOWN'
-	status = 500
 
 	try:
 		client.settimeout(30)
