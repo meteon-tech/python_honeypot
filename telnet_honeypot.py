@@ -3,16 +3,33 @@ import socket
 import logging
 import threading
 import configparser
+import sys
+import ipaddress
+
 
 config = configparser.ConfigParser()
 config.read('config.ini')
 
-HOST = config.get('Telnet', 'Host', fallback='0.0.0.0')
-TELNET_PORT = config.getint('Telnet', 'Port', fallback=2323)
+try:
+	HOST = config.get('Telnet', 'Host', fallback='0.0.0.0')
+	TELNET_PORT = config.getint('Telnet', 'Port', fallback=2323)
+	MAX_CONNECTIONS = config.getint('Telnet', 'Connections', fallback=10)
+
+	ipaddress.ip_address(HOST)
+
+	if TELNET_PORT > 65535 or TELNET_PORT < 1:
+		raise ValueError('Port is out of range')
+
+	if MAX_CONNECTIONS <= 0:
+		raise ValueError('Max conections must be greater than zero')
+
+except Exception as e:
+	print(f'Wrong configuration format: {e}')
+	sys.exit()
+
 
 LOG_FILE = 'honeypot_telnet_logs.csv' 
 BANNER = b'Linux 3.10.14 armv7l\r\n\r\n# '
-MAX_CONNECTIONS = config.getint('Telnet', 'Connections', fallback=10)
 MAX_CONNECTION_SIZE = 4096
 
 
@@ -77,7 +94,9 @@ def handleClient(client, addr):
 					client.send(b'root\r\n')
 				elif command.lower() == 'ls':
 					client.send(b'bin\tdev\tetc\thome\tlib\tproc\troot\ttmp\tvar\r\n')
+
 				client.send(b'# ')
+
 	except socket.timeout:
 		honeypotLog.warning(f'Connection timed out {ip}')
 
@@ -104,6 +123,9 @@ def main():
 		while True:
 			try:
 				client, addr = server.accept()
+
+				print(f'Session accepted by {addr[0]}:{addr[1]}')
+
 				if threadLimiter.acquire(blocking=False):
 					thread = threading.Thread(target=handleClient, args=(client, addr), daemon=True)
 					thread.start()
