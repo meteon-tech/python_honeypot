@@ -19,7 +19,7 @@ try:
 	HTTP_PORT = config.getint('HTTP', 'Port', fallback=8080)
 	MAX_CONNECTIONS = config.getint('HTTP', 'Connections', fallback=10)
 
-	
+
 	ipaddress.ip_address(HOST)
 
 	if HTTP_PORT > 65535 or HTTP_PORT < 1:
@@ -155,7 +155,12 @@ def main():
 	server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-	server.bind((HOST, HTTP_PORT))
+	try:
+		server.bind((HOST, HTTP_PORT))
+	except:
+		print('Wrong ip address or port on interface')
+		sys.exit()
+
 
 	server.listen(5)
 	server.settimeout(1)
