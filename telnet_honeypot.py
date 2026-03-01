@@ -90,10 +90,14 @@ def handleClient(client, addr):
 
 				if command.lower() == 'exit':
 					return
-				elif command.lower() == 'whoami':
+				elif command == 'whoami':
 					client.send(b'root\r\n')
-				elif command.lower() == 'ls':
+				elif command == 'ls':
 					client.send(b'bin\tdev\tetc\thome\tlib\tproc\troot\ttmp\tvar\r\n')
+				elif command == 'pwd':
+					client.send(b'/\r\n')
+				elif command == 'id':
+					client.send(b'uid=0(root) gid=0(root) groups=0(root)\r\n')
 
 				client.send(b'# ')
 
@@ -113,7 +117,13 @@ def main():
 
 	server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-	server.bind((HOST, TELNET_PORT))
+
+	try:
+		server.bind((HOST, TELNET_PORT))
+	except:
+		print('Wrong ip address or port on interface')
+		sys.exit()
+
 	server.listen(5)
 	server.settimeout(1)
 
