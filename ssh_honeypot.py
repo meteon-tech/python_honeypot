@@ -60,17 +60,21 @@ class Honeypot(asyncssh.SSHServer):
 
 async def serverStart():
 	key = asyncssh.generate_private_key('ssh-rsa')
+	try:
 
-	await asyncssh.create_server(
-		Honeypot,
-		host=HOST,
-		port=SSH_PORT,
-		server_host_keys=[key],
-		password_auth=True,
-		kbdint_auth=False
-	)
+		await asyncssh.create_server(
+			Honeypot,
+			host=HOST,
+			port=SSH_PORT,
+			server_host_keys=[key],
+			password_auth=True,
+			kbdint_auth=False
+		)
+	except:
+		print('Wrong ip address or port on interface')
+		sys.exit()
 
-	print(f'SSH honeypot is runing on: {HOST}:{SSH_PORT}')
+	print(f'SSH honeypot is running on: {HOST}:{SSH_PORT}')
 	await asyncio.Future()
 
 try:
