@@ -60,7 +60,13 @@ handler.authorizer = authorizer
 handler.banner = 'ProFTPD 1.3.5 Server (Debian)'
 
 address = (HOST, FTP_PORT)
-server = FTPServer(address, handler)
+
+try:
+	server = FTPServer(address, handler)
+except:
+	print('Wrong ip address or port on interface')
+	sys.exit()
+
 
 server.max_cons = MAX_CONNECTIONS
 server.max_cons_per_ip = 3
